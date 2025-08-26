@@ -214,6 +214,19 @@
 
     spawnFood();
     gameLoop();
+
+    document.addEventListener("mousemove", (e) => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+document.addEventListener("touchmove", (e) => {
+  const touch = e.touches[0];
+  mouse.x = touch.clientX;
+  mouse.y = touch.clientY;
+});
+
   </script>
 </body>
 </html>
+
