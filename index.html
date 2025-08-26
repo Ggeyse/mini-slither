@@ -226,7 +226,193 @@ document.addEventListener("touchmove", (e) => {
   mouse.y = touch.clientY;
 });
 
+    const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+// --- Game state ---
+let snake = [{ x: 200, y: 200 }];
+let food = { x: 300, y: 300 };
+let length = 5;
+let angle = 0;
+let speed = 2.25;
+let mouse = { x: 200, y: 200 };
+
+let npcs = [
+  { body: [{ x: 500, y: 300 }], length: 5, color: "orange" },
+  { body: [{ x: 800, y: 500 }], length: 5, color: "cyan" }
+];
+
+// HUD
+let apples = 0;
+let startTime = Date.now();
+let gameOver = false;
+
+document.addEventListener("mousemove", (e) => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+document.addEventListener("touchmove", (e) => {
+  const touch = e.touches[0];
+  mouse.x = touch.clientX;
+  mouse.y = touch.clientY;
+}, { passive: true });
+
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  g.addColorStop(0, "#0f0f0f");
+  g.addColorStop(1, "#2b2b2b");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  for (let x = 0; x < canvas.width; x += 50) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y < canvas.height; y += 50) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+}
+
+function spawnFood() {
+  food = {
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height
+  };
+}
+
+function drawSnake(body, color) {
+  ctx.fillStyle = color;
+  for (let i = 0; i < body.length; i++) {
+    ctx.beginPath();
+    ctx.arc(body[i].x, body[i].y, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function moveNPC(npc) {
+  const dx = food.x - npc.body[0].x;
+  const dy = food.y - npc.body[0].y;
+  const npcAngle = Math.atan2(dy, dx);
+  const newHead = {
+    x: npc.body[0].x + Math.cos(npcAngle) * 1.8,
+    y: npc.body[0].y + Math.sin(npcAngle) * 1.8
+  };
+  npc.body.unshift(newHead);
+  if (npc.body.length > npc.length) npc.body.pop();
+
+  // NPC eats food
+  const dist = Math.hypot(npc.body[0].x - food.x, npc.body[0].y - food.y);
+  if (dist < 15) {
+    npc.length += 5;
+    spawnFood();
+  }
+}
+
+function checkCollision() {
+  // Check head vs npc bodies
+  for (let npc of npcs) {
+    for (let part of npc.body) {
+      let dist = Math.hypot(snake[0].x - part.x, snake[0].y - part.y);
+      if (dist < 10) {
+        gameOver = true;
+      }
+    }
+  }
+}
+
+function drawHUD() {
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
+  ctx.fillText("Apples: " + apples, 20, 30);
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  ctx.fillText("Time: " + elapsed + "s", 20, 60);
+}
+
+function drawGameOver() {
+  // red overlay
+  ctx.fillStyle = "rgba(200,0,0,0.5)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "white";
+  ctx.font = "50px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 40);
+  ctx.font = "30px Arial";
+  ctx.fillText("Apples: " + apples, canvas.width/2, canvas.height/2 + 10);
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  ctx.fillText("Time: " + elapsed + "s", canvas.width/2, canvas.height/2 + 50);
+}
+
+function gameLoop() {
+  drawBackground();
+
+  if (!gameOver) {
+    // move player snake
+    const dx = mouse.x - snake[0].x;
+    const dy = mouse.y - snake[0].y;
+    angle = Math.atan2(dy, dx);
+    const newHead = {
+      x: snake[0].x + Math.cos(angle) * speed,
+      y: snake[0].y + Math.sin(angle) * speed
+    };
+    snake.unshift(newHead);
+    if (snake.length > length) snake.pop();
+
+    // draw player snake
+    drawSnake(snake, "lime");
+
+    // eyes
+    const head = snake[0];
+    const eyeDist = 6, eyeR = 3, pupilR = 1.5;
+    const ex1 = head.x + Math.cos(angle + Math.PI/4) * eyeDist;
+    const ey1 = head.y + Math.sin(angle + Math.PI/4) * eyeDist;
+    const ex2 = head.x + Math.cos(angle - Math.PI/4) * eyeDist;
+    const ey2 = head.y + Math.sin(angle - Math.PI/4) * eyeDist;
+    ctx.fillStyle = "white";
+    ctx.beginPath(); ctx.arc(ex1, ey1, eyeR, 0, Math.PI*2); ctx.arc(ex2, ey2, eyeR, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "black";
+    ctx.beginPath(); ctx.arc(ex1, ey1, pupilR, 0, Math.PI*2); ctx.arc(ex2, ey2, pupilR, 0, Math.PI*2); ctx.fill();
+
+    // draw and move NPCs
+    for (let npc of npcs) {
+      moveNPC(npc);
+      drawSnake(npc.body, npc.color);
+    }
+
+    // draw food
+    ctx.fillStyle = "red";
+    ctx.beginPath(); ctx.arc(food.x, food.y, 10, 0, Math.PI*2); ctx.fill();
+
+    // eat food (player)
+    const dist = Math.hypot(snake[0].x - food.x, snake[0].y - food.y);
+    if (dist < 15) {
+      length += 5;
+      apples++;
+      spawnFood();
+    }
+
+    checkCollision();
+    drawHUD();
+  } else {
+    drawGameOver();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+spawnFood();
+gameLoop();
+
   </script>
 </body>
 </html>
+
 
